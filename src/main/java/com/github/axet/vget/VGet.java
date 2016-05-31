@@ -1,16 +1,5 @@
 package com.github.axet.vget;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import org.apache.commons.io.FileUtils;
-import org.apache.commons.lang3.StringUtils;
-
 import com.github.axet.threads.LimitThreadPool;
 import com.github.axet.vget.info.VGetParser;
 import com.github.axet.vget.info.VideoFileInfo;
@@ -18,19 +7,20 @@ import com.github.axet.vget.info.VideoInfo;
 import com.github.axet.vget.info.VideoInfo.States;
 import com.github.axet.vget.vhs.VimeoParser;
 import com.github.axet.vget.vhs.YouTubeParser;
-import com.github.axet.wget.Direct;
-import com.github.axet.wget.DirectMultipart;
-import com.github.axet.wget.DirectRange;
-import com.github.axet.wget.DirectSingle;
-import com.github.axet.wget.RetryWrap;
+import com.github.axet.wget.*;
 import com.github.axet.wget.info.DownloadInfo;
 import com.github.axet.wget.info.DownloadInfo.Part;
-import com.github.axet.wget.info.ex.DownloadError;
-import com.github.axet.wget.info.ex.DownloadIOCodeError;
-import com.github.axet.wget.info.ex.DownloadIOError;
-import com.github.axet.wget.info.ex.DownloadInterruptedError;
-import com.github.axet.wget.info.ex.DownloadMultipartError;
-import com.github.axet.wget.info.ex.DownloadRetry;
+import com.github.axet.wget.info.ex.*;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class VGet {
     protected VideoInfo info;
@@ -93,17 +83,17 @@ public class VGet {
     }
 
     public void download() {
-        download(null, new AtomicBoolean(false), new Runnable() {
+        download(null, new AtomicBoolean(false), new VGetNotifier() {
             @Override
-            public void run() {
+            public void run(VideoInfo info) {
             }
         });
     }
 
     public void download(VGetParser user) {
-        download(user, new AtomicBoolean(false), new Runnable() {
+        download(user, new AtomicBoolean(false), new VGetNotifier() {
             @Override
-            public void run() {
+            public void run(VideoInfo info) {
             }
         });
     }
@@ -166,7 +156,7 @@ public class VGet {
         return null;
     }
 
-    public void retry(VGetParser user, AtomicBoolean stop, Runnable notify, Throwable e) {
+    public void retry(VGetParser user, AtomicBoolean stop, final VGetNotifier notify, Throwable e) {
         boolean retracted = false;
 
         while (!retracted) {
@@ -177,7 +167,7 @@ public class VGet {
                     throw new DownloadInterruptedError("interrupted");
 
                 info.setRetrying(i, e);
-                notify.run();
+                notify.run(info);
 
                 try {
                     Thread.sleep(RetryWrap.RETRY_SLEEP);
@@ -194,7 +184,12 @@ public class VGet {
                 List<VideoFileInfo> infoOldList = info.getInfo();
 
                 user = parser(user, info.getWeb());
-                user.info(info, stop, notify);
+                user.info(info, stop, new Runnable() {
+                    @Override
+                    public void run() {
+                        notify.run(info);
+                    }
+                });
 
                 if (infoOldList != null) {
                     // info replaced by user.info() call
@@ -217,13 +212,13 @@ public class VGet {
             } catch (DownloadIOCodeError ee) {
                 if (retry(ee)) {
                     info.setState(States.RETRYING, ee);
-                    notify.run();
+                    notify.run(info);
                 } else {
                     throw ee;
                 }
             } catch (DownloadRetry ee) {
                 info.setState(States.RETRYING, ee);
-                notify.run();
+                notify.run(info);
             }
         }
     }
@@ -374,14 +369,14 @@ public class VGet {
     }
 
     public void extract() {
-        extract(new AtomicBoolean(false), new Runnable() {
+        extract(new AtomicBoolean(false), new VGetNotifier() {
             @Override
-            public void run() {
+            public void run(VideoInfo info) {
             }
         });
     }
 
-    public void extract(AtomicBoolean stop, Runnable notify) {
+    public void extract(AtomicBoolean stop, VGetNotifier notify) {
         extract(null, stop, notify);
     }
 
@@ -395,16 +390,21 @@ public class VGet {
      * @param notify
      *            notify executre
      */
-    public void extract(VGetParser user, AtomicBoolean stop, Runnable notify) {
+    public void extract(VGetParser user, AtomicBoolean stop, final VGetNotifier notify) {
         try {
             while (!done(stop)) {
                 try {
                     if (info.empty()) {
                         info.setState(States.EXTRACTING);
                         user = parser(user, info.getWeb());
-                        user.info(info, stop, notify);
+                        user.info(info, stop, new Runnable() {
+                            @Override
+                            public void run() {
+                                notify.run(info);
+                            }
+                        });
                         info.setState(States.EXTRACTING_DONE);
-                        notify.run();
+                        notify.run(info);
                     }
                     return;
                 } catch (DownloadRetry e) {
@@ -424,7 +424,7 @@ public class VGet {
             }
         } catch (DownloadInterruptedError e) {
             info.setState(States.STOP);
-            notify.run();
+            notify.run(info);
             throw e;
         }
     }
@@ -477,11 +477,11 @@ public class VGet {
             throw new DownloadError(f);
     }
 
-    public void download(final AtomicBoolean stop, final Runnable notify) {
+    public void download(final AtomicBoolean stop, final VGetNotifier notify) {
         download(null, stop, notify);
     }
 
-    public void download(VGetParser user, final AtomicBoolean stop, final Runnable notify) {
+    public void download(VGetParser user, final AtomicBoolean stop, final VGetNotifier notify) {
         try {
             if (empty()) {
                 extract(user, stop, notify);
@@ -567,11 +567,11 @@ public class VGet {
                                 switch (dinfo.getState()) {
                                 case DOWNLOADING:
                                     info.setState(States.DOWNLOADING);
-                                    notify.run();
+                                    notify.run(info);
                                     break;
                                 case RETRYING:
                                     info.setRetrying(dinfo.getDelay(), dinfo.getException());
-                                    notify.run();
+                                    notify.run(info);
                                     break;
                                 default:
                                     // we can safely skip all statues.
@@ -627,7 +627,7 @@ public class VGet {
                     }
 
                     info.setState(States.DONE);
-                    notify.run();
+                    notify.run(info);
                     // break while()
                     return;
                 } catch (DownloadRetry e) {
@@ -647,11 +647,11 @@ public class VGet {
             }
         } catch (DownloadInterruptedError e) {
             info.setState(VideoInfo.States.STOP, e);
-            notify.run();
+            notify.run(info);
             throw e;
         } catch (RuntimeException e) {
             info.setState(VideoInfo.States.ERROR, e);
-            notify.run();
+            notify.run(info);
             throw e;
         }
     }

@@ -1,12 +1,5 @@
 package com.github.axet.vget;
 
-import java.io.File;
-import java.net.URL;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import com.github.axet.vget.info.VGetParser;
 import com.github.axet.vget.info.VideoFileInfo;
 import com.github.axet.vget.info.VideoInfo;
@@ -17,6 +10,13 @@ import com.github.axet.wget.info.DownloadInfo;
 import com.github.axet.wget.info.DownloadInfo.Part;
 import com.github.axet.wget.info.DownloadInfo.Part.States;
 import com.github.axet.wget.info.ex.DownloadInterruptedError;
+
+import java.io.File;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class AppManagedDownload {
 
@@ -51,10 +51,9 @@ public class AppManagedDownload {
     public void run(String url, File path) {
         try {
             final AtomicBoolean stop = new AtomicBoolean(false);
-            Runnable notify = new Runnable() {
+            VGetNotifier notify = new VGetNotifier() {
                 @Override
-                public void run() {
-                    VideoInfo videoinfo = AppManagedDownload.this.videoinfo;
+                public void run(VideoInfo videoinfo) {
                     List<VideoFileInfo> dinfoList = videoinfo.getInfo();
 
                     // notify app or save download state
