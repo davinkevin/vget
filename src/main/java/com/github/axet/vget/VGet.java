@@ -17,6 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -673,6 +674,56 @@ public class VGet {
             throw new RuntimeException("unsupported web site");
 
         return ei;
+    }
+
+    public static VgetBuilder from(String url) {
+        try {
+            return new VgetBuilder(new URL(url));
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+            return new VgetBuilder();
+        }
+    }
+
+    public static class VgetBuilder {
+
+        private URL url;
+        private VGetNotifier notifier;
+        private AtomicBoolean stop;
+        private File dir;
+
+        private VgetBuilder(URL url) { this.url = url; }
+        private VgetBuilder() {}
+
+        public VgetBuilder with(VGetNotifier notifier) {
+            this.notifier = notifier;
+            return this;
+        }
+
+        public VgetBuilder stopOn(AtomicBoolean stop) {
+            this.stop = stop;
+            return this;
+        }
+
+        public VgetBuilder inDir(File dir) {
+            this.dir = dir;
+            return this;
+        }
+
+        public VGet download() {
+            if (url == null)
+                throw new RuntimeException("Url must be defined");
+
+            VGetParser user = VGet.parser(url);
+            VideoInfo videoinfo = user.info(url);
+            VGet v = new VGet(videoinfo, dir);
+
+            v.extract(user, stop, notifier);
+            v.download(user, stop, notifier);
+
+            return v;
+        }
+
     }
 
 }
