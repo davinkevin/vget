@@ -17,6 +17,7 @@ import org.apache.commons.lang3.StringUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
@@ -688,5 +689,75 @@ public class VGet {
             throw new RuntimeException("unsupported web site");
 
         return ei;
+    }
+
+    static VgetBuilder from(String url) {
+        try {
+            return new VgetBuilder(new URL(url));
+        } catch (MalformedURLException e) {
+            return new VgetBuilder(e);
+        }
+    }
+
+    public static class VgetBuilder {
+
+        private URL url;
+        private VGetNotifier notifier;
+        private Runnable runnable;
+        private AtomicBoolean stop;
+        private File dir;
+        private Exception creationException;
+
+        private VgetBuilder(URL url) { this.url = url; }
+        public VgetBuilder(Exception e) {
+            this.creationException = e;
+        }
+
+        public VgetBuilder with(VGetNotifier notifier) {
+            this.notifier = notifier;
+            return this;
+        }
+
+        public VgetBuilder with(Runnable runnable) {
+            this.runnable = runnable;
+            return this;
+        }
+
+        public VgetBuilder stopOn(AtomicBoolean stop) {
+            this.stop = stop;
+            return this;
+        }
+
+        public VgetBuilder inDir(File dir) {
+            this.dir = dir;
+            return this;
+        }
+
+        public VGet download() {
+            if (creationException != null)
+                throw new RuntimeException("Problem during execution", creationException);
+
+            VGetParser user = VGet.parser(url);
+            VideoInfo videoinfo = user.info(url);
+            VGet v = new VGet(videoinfo, dir);
+
+            if (notifier == null && runnable == null) {
+                v.download();
+            }
+
+            if (notifier != null) {
+                v.extract(user, stop, notifier);
+                v.download(user, stop, notifier);
+
+                return v;
+            }
+
+            v.extract(user, stop, runnable);
+            v.download(user, stop, runnable);
+
+            return v;
+        }
+
+
     }
 }
