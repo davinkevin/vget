@@ -1,47 +1,28 @@
 package com.github.axet.vget.vhs;
 
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.script.Invocable;
-import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
-
+import com.github.axet.vget.info.VGetParser;
+import com.github.axet.vget.info.VideoFileInfo;
+import com.github.axet.vget.info.VideoInfo;
+import com.github.axet.vget.info.VideoInfo.States;
+import com.github.axet.vget.vhs.YouTubeInfo.*;
+import com.github.axet.wget.WGet;
+import com.github.axet.wget.info.ex.DownloadError;
+import com.github.axet.wget.info.ex.DownloadRetry;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.NameValuePair;
 import org.apache.http.client.utils.URLEncodedUtils;
 
-import com.github.axet.vget.info.VGetParser;
-import com.github.axet.vget.info.VideoFileInfo;
-import com.github.axet.vget.info.VideoInfo;
-import com.github.axet.vget.info.VideoInfo.States;
-import com.github.axet.vget.vhs.YouTubeInfo.AudioQuality;
-import com.github.axet.vget.vhs.YouTubeInfo.Container;
-import com.github.axet.vget.vhs.YouTubeInfo.Encoding;
-import com.github.axet.vget.vhs.YouTubeInfo.StreamAudio;
-import com.github.axet.vget.vhs.YouTubeInfo.StreamCombined;
-import com.github.axet.vget.vhs.YouTubeInfo.StreamInfo;
-import com.github.axet.vget.vhs.YouTubeInfo.StreamVideo;
-import com.github.axet.vget.vhs.YouTubeInfo.YoutubeQuality;
-import com.github.axet.wget.WGet;
-import com.github.axet.wget.info.ex.DownloadError;
-import com.github.axet.wget.info.ex.DownloadRetry;
+import javax.script.Invocable;
+import javax.script.ScriptEngine;
+import javax.script.ScriptEngineManager;
+import java.net.*;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class YouTubeParser extends VGetParser {
 
@@ -236,7 +217,7 @@ public class YouTubeParser extends VGetParser {
             Pattern decodeFunction = Pattern
                     // this will probably change from version to version so
                     // changes have to be done here
-                    .compile(String.format("(%s=function\\([a-zA-Z0-9$]+\\)\\{.*?\\}),", functionName), Pattern.DOTALL);
+                    .compile(String.format("(%s=function\\([a-zA-Z0-9$]+\\)\\{[^}]*\\})", functionName), Pattern.DOTALL);
             Matcher decodeFunctionMatch = decodeFunction.matcher(playerJS);
             if (decodeFunctionMatch.find()) {
                 decodeScript.append(decodeFunctionMatch.group(1)).append(';');
